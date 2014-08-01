@@ -1,0 +1,144 @@
+
+NpsGate Plugin Howto
+====================
+
+This document describes the procedure for create a NpsGate plugin from scratch.
+
+1. Create your plugin directory
+-------------------------------
+Each plugin has its own source directory in the 'src/plugins' directory. Create a new
+directory with the same name as your plugin. Plugin names should only use alphanumeric
+characters and the underscore character. Do not use spaces.
+
+
+2. Create your source file
+--------------------------
+Create your source .cpp file. Each plugin must have at least one .cpp file. Additional
+source and header files can be added if needed. Your primary .cpp file should include
+the main class of your plugin, which should be a derived from the NpsGatePlugin class.
+Make sure you include the 'npsgate_plugin.hpp' file.
+
+Each plugin must also call the 'NPSGATE_PLUGIN_CREATE' and 'NPSGATE_PLUGIN_DESTROY'
+macros. The create macro takes one parameter, the name of your plugin class.
+
+Each plugin should override the four virtual functions in the NpsGatePlugin class. They
+are as follows:
+
+	bool init();
+		- Init performs initialization required by the plugin. Initialization that
+		  could fail *should not* be done in the class constructor and should be done
+		  in this function. Returns true on success, false on failure.
+		- Keep in mind that depending on what order your plugin is loaded, other plugins
+		  may not be loaded yet. If you have initialization that required input from
+		  other plugins, move that code to the main function below.
+
+	bool process_packet(Packet* p);
+		- When a packet is sent to your plugin this function is called with a pointer
+		  to the packet. Your plugin can analyze and modify the packet if required. Once
+		  finished, call 'forward_packet' to forward the packet to the next plugin.
+		- If you are writing an output plugin, you should 'drop_packet' once it has been
+		  transmitted to remove it from the NpsGate packet store.
+		- If you are writing a plugin that should not receive packets it is safe to not
+		  define this function. The NpsGate core will create an exception if another plugin
+		  attempts to send you a packet.
+
+	bool process_message(Message* m);
+		- When a message is sent to you plugin this function is called with a pointer
+		  to the message.
+		- Messages are shared amongst all plugins that receive them and are automatically
+		  destroyed once they are no longer needed. If your plugin needs data stored in
+		  the Message after returning from this function, make sure you add a reference
+		  to the Message before returning. Once you are done with the Message, make sure
+		  you unreference the message to allow the NpsGate core to delete the message.
+
+	bool main();
+		- You plugin's main entry point. When this function is called, it is gauranteed
+		  that all plugins have been loaded and initialized. Typically the main function
+		  will perform any initialization requiring input from other plugins, and then
+		  will call the 'message_loop' function from the base class.
+		- The 'message_loop' function will automatically call 'process_packet' and
+		  'process_message' as your plugin receives input.
+		- If you are designing an input plugin, your main should not call 'message_loop'
+		  and should directly handle reading input from your external source.
+		- When your main exits, your thread exits. Don't exit the main unless your
+		  plugin is done forever or has encountered an error. Depending on the
+		  configuration, the NpsGate core may try to restart your plugin if you exit
+		  main.
+
+An minimal example would look like the following:
+
+	#include "../npsgate_plugin.hpp"
+
+	class MyPlugin : public NpsGatePlugin {
+		bool init() {
+			return true;
+		}
+
+		bool process_packet(Packet* p) {
+			// do something here
+			return true;
+		}
+
+		bool process_message(Message* m) {
+			// do something here
+			return true;
+		}
+
+		bool main() {
+			message_loop();
+			return true;
+		}
+	}
+
+	NPSGATE_PLUGIN_CREATE(MyPlugin);
+	NPSGATE_PLUGIN_DESTROY();
+
+
+3. Add plugin to build system (recommended)
+-------------------------------------------
+NpsGate core uses the GNU automake/autoconf system to manage building NpsGate and all the
+plugins. Adding your plugin to the build system is easy. First you need to create a file
+called 'Makefile.am' in your plugin directory. The Makefile.am for the sample plugin shown
+in step 2 would look as follows:
+
+	lib_LTLIBRARIES = myplugin.la
+	myplugin_la_SOURCES = myplugin.cpp
+	myplugin_la_CPPFLAGS = <additional flags as required>
+	myplugin_la_LDFLAGS = -module -avoid-version -shared <additonal flags as required>
+	myplugin_la_LIBS = <additional libraries as required>
+
+Additional CPPFLAGS, LDFLAGS, and LIBS can be added as required. The global flags already
+include the necessary items for libcrafter, libconfig++, pthreads, and libpcap. The SOURCES
+directive should include all source files needed to compile your plugin. Header files do
+not need to be included.
+
+After saving your Makefile.am, go to the 'build' directory and run './autogen.sh'. This
+script will look for new plugins and add them to the build system. The autogen script's output
+should indicate that it found your plugin.
+
+Providing autogen completed successfully, you can now run './configure' which will configure
+your plugin and your plugin will be build next time 'make' is run. In addition, your plugin
+binary will be copied to the correct directory when 'make install' is run.
+
+Your plugin can be manually enabled or disabled using the configure script using the
+'--enable-<PLUGIN_NAME>' and '--disable-<PLUGIN_NAME>'.
+
+IMPORTANT NOTE: If your plugin does not compile, add your plugin to the DISABLED_PLUGINS file
+in the 'build' directory. This will cause your plugin to be disabled by default so that others
+can still compile NpsGate. You can manually enable your plugin during development by passing
+the '--enable-<PLUGIN_NAME>' option to configure.
+
+
+4. What to add to Version Control
+---------------------------------
+If adding your plugin to version control, you should only add your source files, Makefile.am,
+and Makefile.in to version control.
+
+You should NOT add Makefile or the .libs and .deps directories. Before committing it may be
+helpful to run a 'make distclean' to remove all temporary files. Any files left in your
+plugin directory after running the distclean should be added to version control.
+
+
+
+
+

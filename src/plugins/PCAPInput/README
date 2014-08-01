@@ -1,0 +1,9 @@
+
+PCAPInput Plugin
+=============================================
+
+Exports:
+	pcapinput.packet_count		- Number of packets read. Updated after each packet is read.
+	pcapinput.packet_size		- Packet size. Updated after each packet is read.
+
+
