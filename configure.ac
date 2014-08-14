@@ -1,5 +1,5 @@
 AC_INIT([NpsGate], [0.1])
-AM_INIT_AUTOMAKE([foreign -Wall no-define])
+AM_INIT_AUTOMAKE([foreign -Wall no-define subdir-objects])
 AC_CONFIG_SRCDIR([configure.ac])
 AC_CONFIG_FILES([Makefile])
 AC_CONFIG_MACRO_DIR([m4])
@@ -28,7 +28,6 @@ AC_CHECK_HEADERS([sys/ioctl.h])
 AC_CHECK_HEADER_STDBOOL
 AC_C_INLINE
 AC_FUNC_MALLOC
-AC_PROG_RANLIB
 AC_TYPE_INT32_T
 AC_TYPE_UINT32_T
 AC_TYPE_UINT64_T
