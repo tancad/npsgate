@@ -35,6 +35,8 @@
 using namespace Crafter;
 using namespace NpsGate;
 
+#define PORT_MAX 0xffff
+
 struct PortRange {
 	string plugin;
 	uint16_t start;
@@ -61,7 +63,7 @@ public:
 		const Setting& outputs = root["outputs"];
 
 		LOG_INFO("There are %u outputs:\n", outputs.getLength());
-		ports.resize(outputs.getLength());
+		//ports.resize(outputs.getLength());
 
 		for(int i = 0; i < outputs.getLength(); i++) {
 			const Setting& pconf = outputs[i];
@@ -73,13 +75,13 @@ public:
 				LOG_CRITICAL("Missing plugin name!\n");
 			}
 		
-			if(!pconf.lookupValue("port", port_num)) {
-				if(port_num > UINT16_MAX) {
-					LOG_WARNING("Specified port %u is greater than %u. This output will be ignored.\n", port_num, UINT16_MAX);
+			if(pconf.lookupValue("port", port_num)) {
+				if(port_num > PORT_MAX) {
+					LOG_WARNING("Specified port %u is greater than %u. This output will be ignored.\n", port_num, PORT_MAX);
 					continue;
 				}
 				pr.end = pr.start = port_num;
-			} else if(!pconf.lookupValue("port", port_str)) {
+			} else if(pconf.lookupValue("port", port_str)) {
 				if(2 != sscanf(port_str.c_str(), "%hu-%hu", &pr.start, &pr.end)) {
 					LOG_WARNING("Failed to parse port specification '%s' into port range. This output will be ignored.\n", port_str.c_str());
 					continue;
@@ -100,7 +102,7 @@ public:
 		IP* ip = p->GetLayer<IP>();
 		TCP* tcp = p->GetLayer<TCP>();
 		UDP* udp = p->GetLayer<UDP>();
-		uint32_t dport;
+		uint16_t dport, sport;
 		
 		if(!ip) {
 			LOG_WARNING("Received a non-IP packet. Dropping packet!\n");
@@ -110,8 +112,10 @@ public:
 
 		if(tcp) {
 			dport = tcp->GetDstPort();
+			sport = tcp->GetSrcPort();
 		} else if(udp) {
 			dport = udp->GetDstPort();
+			sport = udp->GetSrcPort();
 		} else {
 			LOG_WARNING("Received packet did not contain a TCP or UDP layer. Dropping packet!\n");
 			drop_packet(p);
@@ -119,16 +123,17 @@ public:
 		}
 
 		BOOST_FOREACH(PortRange& pr, ports) {
-			if(dport >= pr.start && dport <= pr.end) {
+			if((dport >= pr.start && dport <= pr.end) || (sport >= pr.start && sport <= pr.end)) {
 				LOG_TRACE("Port range found for port %u. Routing to '%s' (%u-%u).\n",
 						dport, pr.plugin.c_str(), pr.start, pr.end);
 				forward_packet(pr.plugin, p);
+				return true;
 			}
 		}
 
 		LOG_TRACE("No port range found for port %u. Sending to default plugin '%s'.\n",
-				dport, get_default_output().c_str());
-		forward_packet(get_default_output(), p);
+				dport, ports[0].plugin.c_str());
+		forward_packet(ports[0].plugin, p);
 
 		return true;
 	}
