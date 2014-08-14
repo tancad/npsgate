@@ -39,13 +39,14 @@ using namespace std;
 
 namespace NpsGate {
 
-PluginCore::PluginCore(const NpsGateContext& c, string pname) : context(c) {
+PluginCore::PluginCore(const NpsGateContext& c, string pname) : context(c), 
+	handle(NULL), config(NULL), create(NULL), destroy(NULL),
+	packets_in(0), packets_out(0), packets_dropped(0) {
 	name = pname;
-	config = NULL;
-	packets_in = packets_out = packets_dropped = 0;
 	exit_flag = false;
 	jobqueue_timeout = 0xffffffff;
 }
+
 
 PluginCore::~PluginCore() {
 	if(handle) {
