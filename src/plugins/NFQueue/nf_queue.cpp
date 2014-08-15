@@ -1,19 +1,27 @@
 /******************************************************************************
 **
+**  PortRouter plugin.
+**  Copyright (c) 2014, Lance Alt
+**
 **  This file is part of NpsGate.
 **
-**  This software was developed at the Naval Postgraduate School by employees
-**  of the Federal Government in the course of their official duties. Pursuant
-**  to title 17 Section 105 of the United States Code this software is not
-**  subject to copyright protection and is in the public domain. NpsGate is an
-**  experimental system. The Naval Postgraduate School assumes no responsibility
-**  whatsoever for its use by other parties, and makes no guarantees, expressed
-**  or implied, about its quality, reliability, or any other characteristic. We
-**  would appreciate acknowledgment if the software is used.
+**  This program is free software: you can redistribute it and/or modify
+**  it under the terms of the GNU General Public License as published
+**  by the Free Software Foundation, either version 3 of the License, or
+**  (at your option) any later version.
+** 
+**  This program is distributed in the hope that it will be useful,
+**  but WITHOUT ANY WARRANTY; without even the implied warranty of
+**  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+**  GNU General Public License for more details.
+** 
+**  You should have received a copy of the GNU Lesser General Public License
+**  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+** 
 **
 **  @file nf_queue.cpp
 **  @author Lance Alt (lancealt@gmail.com)
-**  @date 2014/09/01
+**  @date 2014/09/14
 **
 *******************************************************************************/
 
@@ -22,6 +30,7 @@
 #include <unistd.h>
 #include <signal.h>
 #include <boost/algorithm/string.hpp>
+#include <boost/foreach.hpp>
 
 #include <linux/netfilter.h>
 #include <libnetfilter_queue/libnetfilter_queue.h>
@@ -37,26 +46,33 @@ using namespace NpsGate;
 
 class NFQueue : public NpsGatePlugin {
 private:
-	int	m_queue;	// Netfilter queue to create
-	uint32_t m_queue_len;
-	int 	m_mtu;		// MTU of interface
-	timeval m_timeout;	// Timeout for read
-	vector<string> m_rules;	// IPTables rules for NFQueue
+	uint32_t queue_num;
+	uint32_t queue_len;
+	uint32_t mtu;	
+	timeval read_timeout;
 	vector<string> output_map;
 	struct nfq_handle* nf_queue;
 	struct nfq_q_handle* nf_input;
-	const Config* m_config;
 
+	struct NFQueueRule {
+		string protocol;
+		string source, destination;
+		string source_port, destination_port, port;
+	};
+	vector<NFQueueRule> rules;
 public:
 
-	NFQueue(PluginCore* c) : NpsGatePlugin(c), m_mtu(10000) {
-		m_timeout.tv_sec = 10;
-		m_queue = 0;
+	NFQueue(PluginCore* c) : NpsGatePlugin(c), mtu(10000) {
+		read_timeout.tv_sec = 10;
+		read_timeout.tv_usec = 0;
+		queue_num = 0;
 		output_map.resize(256);
 	}
 
 	~NFQueue() {
-		delRules();
+		BOOST_FOREACH(const NFQueueRule& r, rules) {
+			remove_rule(r);
+		}
 		if(nf_input) {
 			nfq_destroy_queue(nf_input);
 		}
@@ -65,51 +81,54 @@ public:
 		}
 	}
 
-	string dec2string(uint32_t dec) {
-		char buf[12];
-		sprintf(buf, "%d", dec);
-		return string(buf);
-	}
-	
-	void addRules() {
-		for(vector<string>::const_iterator iter = m_rules.begin(); iter != m_rules.end(); ++iter){
-			LOG_INFO("Adding iptables rule for %s.\n", iter->c_str());
-			string call = "iptables -t mangle -A FORWARD " + *iter + " -j NFQUEUE --queue-num " + dec2string(m_queue);
-			
-			if (system(call.c_str()) != 0){
-				LOG_WARNING("Iptables add rule error.\n");
-			}
-
-		}
-	}
-	
-	void delRules() {
-		for(vector<string>::const_iterator iter = m_rules.begin(); iter != m_rules.end(); ++iter){
-			 LOG_INFO("Deleting iptables rule for %s\n", iter->c_str());
-			string call = "iptables -t mangle -D FORWARD " + *iter + " -j NFQUEUE --queue-num " + dec2string(m_queue);
-			
-			if (system(call.c_str()) != 0){
-				LOG_WARNING("Iptables delete rule error.\n");
-			}
-		}
+	inline bool add_rule(const NFQueueRule& r) {
+		return build_rule("-A", r);
 	}
 
+	inline bool remove_rule(const NFQueueRule& r) {
+		return build_rule("-D", r);
+	}
+
+	bool build_rule(const string& action, const NFQueueRule& r) {
+		stringstream call;
+		char buffer[256];
+
+		call << "iptables -t mangle -m multiport " << action << " FORWARD";
+		if(!r.protocol.empty())			{ call << " -p "		<< r.protocol; }
+		if(!r.source.empty())			{ call << " -s "		<< r.source; }
+		if(!r.destination.empty())		{ call << " -d "		<< r.destination; }
+		if(!r.source_port.empty())		{ call << " --sports "	<< r.source_port; }
+		if(!r.destination_port.empty())	{ call << " --dports "	<< r.destination_port; }
+		if(!r.port.empty())				{ call << " --ports "	<< r.port; }
+		call << " -j NFQUEUE --queue-num " << queue_num << " 2>&1";
+
+		LOG_INFO("Calling iptables: '%s'\n", call.str().c_str());
+		FILE* fh = popen(call.str().c_str(), "r");
+		if(!fh) {
+			LOG_WARNING("Executing iptables command failed.\n");
+			return false;
+		}
+
+		fgets(buffer, 256, fh);
+
+		if(0 != pclose(fh)) {
+			LOG_WARNING("iptables completed unsuccessfully. Response was: %s", buffer);
+			return false;
+		}
+
+		return true;
+	}
+	
 	bool init() {
+		const Config* config = get_config();
 
 		LOG_INFO("NFQueue plugin starting initialization.\n");
-		m_config = get_config();
 
 		parse_outputs();
 
-		m_config->lookupValue("nfqueue.queue-number", m_queue);
-
-		if(!m_config->lookupValue("nfqueue.mtu", m_mtu)) {
-			LOG_CRITICAL("Missing TAP interface MTU setting!\n");
-		}
-
-		if(!m_config->lookupValue("nfqueue.read-timeout", (int&)m_timeout.tv_sec)) {
-			LOG_CRITICAL("Missing TAP interface timeout setting!\n");
-		}
+		config->lookupValue("nfqueue.queue-number", queue_num);
+		config->lookupValue("nfqueue.read-read_timeout", (int&)read_timeout.tv_sec);
+		config->lookupValue("nfqueue.mtu", mtu);
 
 		// Open a link to NFQUEUE using the default queue number. Bind to AF_INET, set mode to
 		// copy entire packet to user-space and set the callback function.
@@ -126,7 +145,7 @@ public:
 			LOG_CRITICAL("Failed to bind to AF_INET!\n");
 		}
 
-		nf_input = nfq_create_queue(nf_queue, m_queue, &nf_queue_callback, this);
+		nf_input = nfq_create_queue(nf_queue, queue_num, &nf_queue_callback, this);
 		if(!nf_input) {
 			LOG_CRITICAL("Failed to create NF queue!\n");
 		}
@@ -135,44 +154,38 @@ public:
 			LOG_CRITICAL("Failed to set packet copy mode!\n");
 		}
 		
-		if(!m_config->lookupValue("nfqueue.mtu", m_mtu)) {
-			m_mtu = 1500;	
-		}
-	
-		if(m_config->lookupValue("nfqueue.queue-len", m_queue_len)) {
-			LOG_INFO("Setting max queue length to: %u\n", m_queue_len);
-			if(-1 == nfq_set_queue_maxlen(nf_input, m_queue_len)) {
-				LOG_WARNING("Failed to set max queue length to: %u\n", m_queue_len);
+		if(config->lookupValue("nfqueue.queue-len", queue_len)) {
+			LOG_INFO("Setting max queue length to: %u\n", queue_len);
+			if(-1 == nfq_set_queue_maxlen(nf_input, queue_len)) {
+				LOG_WARNING("Failed to set max queue length to: %u\n", queue_len);
 			}
-			unsigned int new_size = nfnl_rcvbufsiz(nfq_nfnlh(nf_queue), m_queue_len * m_mtu);
-			if(new_size != m_queue_len * m_mtu) {
+			unsigned int new_size = nfnl_rcvbufsiz(nfq_nfnlh(nf_queue), queue_len * mtu);
+			if(new_size != queue_len * mtu) {
 				LOG_WARNING("Failed to set recv buffer size of %u. Size is: %u\n",
-						m_queue_len * m_mtu, new_size);
+						queue_len * mtu, new_size);
 			}
 		}
 
+		const Setting& root = config->getRoot();
+		const Setting& capture_rules = root["nfqueue"]["capture"];
+
 	
-		try {
-			const Setting &subnets = m_config->lookup("nfqueue.subnets");
-			int numNets = subnets.getLength();
-			LOG_INFO("%d subnet(s) defined.\n", numNets);
+		LOG_INFO("There are %d capture rules.\n", capture_rules.getLength());
+		for(int i = 0; i < capture_rules.getLength(); i++) {
+			const Setting& rconf = capture_rules[i];
+			NFQueueRule rule;
+
+			rconf.lookupValue("protocol", rule.protocol);
+			rconf.lookupValue("source", rule.source);
+			rconf.lookupValue("destination", rule.destination);
+			rconf.lookupValue("source-port", rule.source_port);
+			rconf.lookupValue("destination-port", rule.destination_port);
+			rconf.lookupValue("port", rule.port);
 			
-
-			// We must copy the device name string because the string class apparently changes
-			// the pointer each time c_str is called which will cause a "No such device" error
-			// when calling the ioctl().
-			//char* dev_name = strdup(m_tun->getName().c_str());
-
-			for (int i=0; i<numNets; i++){
-				string cidr = subnets[i];
-				string rule = "-d " + cidr;
-				m_rules.push_back(rule);
-				LOG_INFO("Added %s to rules.\n", rule.c_str());
+			if(!add_rule(rule)) {
+				LOG_CRITICAL("Failed to add rule. Aborting.\n");
 			}
-			addRules();
-		} catch(SettingNotFoundException& ex) {
-			LOG_INFO("No 'subnets' directive found. No iptables rules will be added.\n");
-			return true;
+			rules.push_back(rule);
 		}
 
 		return true;
@@ -192,7 +205,7 @@ public:
 
 		if(ip_prot <= output_map.size()) {
 			string output = output_map[ip_prot];
-			if(output != "") {
+			if(!output.empty()) {
 				LOG_TRACE("Protocol %u. Forwarding to %s.\n", ip_prot, output.c_str());
 				return forward_packet(output, p);
 			}
@@ -205,23 +218,29 @@ public:
 	bool main() {
 		int rv, fd;
 		fd_set fdset;
-		char* raw = (char*)alloca(m_mtu);
+		char* raw = (char*)alloca(mtu);
 
 		fd = nfq_fd(nf_queue);
 
 		while (true){
 			LOG_TRACE("Waiting for packet from nfqueue...\n");
 
-			timeval timeout = m_timeout;
+			timeval timeout = read_timeout;
 			FD_ZERO(&fdset);
 			FD_SET(fd, &fdset);
-			if (select(fd+1, &fdset, NULL, NULL, &timeout) < 0) LOG_WARNING("Select error.\n");
-			if (FD_ISSET(fd, &fdset)) {
-				if((rv = recv(fd, raw, m_mtu, 0)) < 0){
-					LOG_WARNING("Error reading data\n");
-				}else{
-					LOG_DEBUG("Packet received!\n");
-					nfq_handle_packet(nf_queue, raw, rv);
+			rv = select(fd+1, &fdset, NULL, NULL, &timeout);
+			if(rv < 0) {
+				LOG_WARNING("Select error.\n");
+			} else if(rv == 0) {
+				LOG_TRACE("Select read_timeout.\n");
+			} else {
+				if(FD_ISSET(fd, &fdset)) {
+					if((rv = recv(fd, raw, mtu, 0)) < 0){
+						LOG_WARNING("Error reading data\n");
+					}else{
+						LOG_DEBUG("Packet received!\n");
+						nfq_handle_packet(nf_queue, raw, rv);
+					}
 				}
 			}
 		}
