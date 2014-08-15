@@ -93,7 +93,10 @@ public:
 		stringstream call;
 		char buffer[256];
 
-		call << "iptables -t mangle -m multiport " << action << " FORWARD";
+		call << "iptables -t mangle " << action << " FORWARD";
+		if(!r.source_port.empty() || !r.destination_port.empty() || !r.port.empty()) {
+			call << " -m multiport ";
+		}
 		if(!r.protocol.empty())			{ call << " -p "		<< r.protocol; }
 		if(!r.source.empty())			{ call << " -s "		<< r.source; }
 		if(!r.destination.empty())		{ call << " -d "		<< r.destination; }
