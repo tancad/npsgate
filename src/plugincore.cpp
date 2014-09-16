@@ -178,10 +178,10 @@ bool PluginCore::forward_packet(string queue, Packet* p) {
 		return false;
 	}
 
-	if(pq->Length() > 100) {
+//	if(pq->Length() > 100) {
 		//LOG_WARNING("Packet queue longer than 100, dropping packet!\n");
-		return false;
-	}
+//		return false;
+//	}
 
 	context.packet_manager->ref_packet(p);
 
