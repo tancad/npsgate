@@ -1,0 +1,32 @@
+NpsGate Example Configuration 'Simple'
+======================================
+This is a simplistic example to get NpsGate up and running. The processing
+pipeline contains three plugins in a linear arrangement. The NFQueue plugin
+captures only packets with a source or destination port 80. Those packets are
+forwarded to the Nothing plugin, which simply forwards packets it receives
+to the IPOutput plugin. The IPOutput plugin uses the host operating system
+to transmit packets over the wire.
+
+
+Required Plugins
+----------------
+NFQueue
+IPOuput
+Nothing
+
+
+Required Configuration
+----------------------
+Ensure the 'plugin_conf_dir' directive in the 'simple.config' file points
+to the directory where the plugin configuration files are located. The
+plugin configuration directory is the directory that contains the
+'nfqueue.config', 'nothing.config', and 'ipoutput.config' files.
+
+
+Running
+-------
+This configuration requires root privalges. Assuming you are in the 'run'
+directory, start NpsGate using the following command:
+
+./npsgate -c /path/to/simple.config
+

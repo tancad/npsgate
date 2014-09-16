@@ -1,0 +1,36 @@
+NpsGate Example Configuration 'Capture'
+=======================================
+This example shows how NpsGate's pipeline can be used duplicate packets
+and have them processed along two different paths. The NFQueue plugin
+captures only packets with a source or destination port 80. Thise packets
+are forwarded to the Duplicate plugin. The Duplicate plugin copies a packet
+and transmits a copy to each configured output, in this case to the IPOutput
+plugin and the PCAPOutput plugin. The IPOutput plugin uses the host operating
+system to transmit packets over the wire. The PCAPOutput plugin writes packets
+to a PCAP file using libpcap.
+
+
+Required Plugins
+----------------
+NFQueue
+IPOuput
+PCAPOutput
+Duplicate
+
+
+Required Configuration
+----------------------
+Ensure the 'plugin_conf_dir' directive in the 'capture.config' file points
+to the directory where the plugin configuration files are located. The
+plugin configuration directory is the directory that contains the
+'nfqueue.config', 'duplicate.config', 'pcap_output.config', and
+'ipoutput.config' files.
+
+
+Running
+-------
+This configuration requires root privalges. Assuming you are in the 'run'
+directory, start NpsGate using the following command:
+
+./npsgate -c /path/to/capture.config
+
