@@ -21,4 +21,5 @@
 *.app
 
 Makefile
+Makefile.in
 .deps
