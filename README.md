@@ -23,6 +23,7 @@ libraries:
   - Boost C++ libraries (specifically system and threads libraries)
   - libconfig (http://www.hyperrealm.com/libconfig)
   - libcrafter (http://code.google.com/p/libcrafter)
+  - libnetfilterqueue-dev (http://www.netfilter.org/projects/libnetfilter_queue/)
 
 Specific plugins may have additional requirements. Once the above library prerequisites
 have been met, NpsGate can be compiled as follows:

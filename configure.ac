@@ -77,20 +77,8 @@ AX_LIBCONFIGXX
 # Check to make sure libcrafter is installed and accessable
 AX_CRAFTER
 
-PKG_CHECK_MODULES(LIBNL3, libnl-3.0 >= 3.1, [have_libnl3=yes], [have_libnl3=no])
-if (test "${have_libnl3}" = "yes"); then
-	CFLAGS+=" $LIBNL3_CFLAGS"
-	CXXFLAGS+=" $LIBNL3_CFLAGS"
-	LIBS+=" $LIBNL3_LIBS"
-fi
-
-
-PKG_CHECK_MODULES(LIBNL3_ROUTE, libnl-route-3.0 >= 3.1, [have_libnl3=yes], [have_libnl3=no])
-if (test "${have_libnl3}" = "yes"); then
-	CFLAGS+=" $LIBNL3_ROUTE_CFLAGS"
-	CXXFLAGS+=" $LIBNL3_ROUTE_CFLAGS"
-	LIBS+=" $LIBNL3_ROUTE_LIBS"
-fi
+# NFQueue plugin requires libnetfilter-queue
+AX_NETFILTER_QUEUE
 
 # Look for plugins that need to be built
 NPSGATE_PLUGIN_PROBE
