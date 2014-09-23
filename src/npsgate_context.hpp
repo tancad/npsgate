@@ -21,6 +21,7 @@
 #define NPSGATE_CONTEXT_HPP_INCLUDED
 
 #include <libconfig.h++>
+#include <boost/filesystem.hpp>
 
 #include "packet_manager.hpp"
 #include "publish_subscribe.h"
@@ -41,6 +42,8 @@ namespace NpsGate {
 			PacketManager* packet_manager;
 			Config* config;
 			Monitor* monitor;
+			boost::filesystem::path library_path;
+			boost::filesystem::path config_path;
 	};
 }
 

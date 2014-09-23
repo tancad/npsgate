@@ -23,6 +23,7 @@
 #include <signal.h>
 #include <getopt.h>
 #include <libconfig.h>
+#include <boost/filesystem.hpp>
 
 #include "pluginmanager.h"
 #include "packet_manager.hpp"
@@ -128,6 +129,7 @@ int main(int argc, char** argv) {
 	try{
 		context.config = new Config();
 		context.config->readFile(config_file);
+		context.config_path = boost::filesystem::path(config_file).parent_path();
 	} catch (const FileIOException& fioex) {
 		printf("Failed to load configuration file: %s\n", config_file);
 		termination_handler(SIGINT);

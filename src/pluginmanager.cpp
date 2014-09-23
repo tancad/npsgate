@@ -28,6 +28,7 @@
 #include <string>
 #include <crafter.h>
 #include <libconfig.h++>
+#include <boost/filesystem.hpp>
 
 #include "npsgate_context.hpp"
 #include "logger.h"
@@ -90,7 +91,7 @@ void PluginManager::load_plugins() {
 
 		/* Lookup the name and library config items. Both are required. */
 		if(!(plugin_conf.lookupValue("name", name) &&
-			 plugin_conf.lookupValue("library", library))) {
+			plugin_conf.lookupValue("library", library))) {
 			LOG_CRITICAL("For plugins: name and library config items are required.\n");
 		}
 		
@@ -98,23 +99,38 @@ void PluginManager::load_plugins() {
 		plugin_conf.lookupValue("config", config_file);
 		plugin_conf.lookupValue("enabled", enabled);
 
-		LOG_INFO("Plugin: name='%s', library='%s', config='%s', enabled=%d\n",
-				name.c_str(), config_file.c_str(), library.c_str(), enabled);
+		boost::filesystem::path plugin_library_path(plugin_path);
+		boost::filesystem::path plugin_library_name(library);
+		boost::filesystem::path plugin_config_full_path(plugin_config_path);
+		boost::filesystem::path plugin_config_name(config_file);
+
+		if(plugin_library_path.has_relative_path()) {
+			boost::filesystem::path temp = plugin_library_path;
+			plugin_library_path = context.library_path;
+			plugin_library_path += temp;
+		}
+
+		plugin_library_path += library;
+
+		if(!config_file.empty()) {
+			if(plugin_config_name.has_relative_path()) {
+				plugin_config_full_path = context.config_path;
+				plugin_config_full_path /= plugin_config_path;
+				plugin_config_full_path /= plugin_config_name;
+			}
+		}
+
+		library = plugin_library_path.native();
+		config_file = plugin_config_full_path.native();
+		LOG_INFO("Loading plugin: %s\n", name.c_str());
+		LOG_INFO("  Library: %s\n", library.c_str());
+		LOG_INFO("  Config: %s\n", config_file.c_str());
+		LOG_INFO("  Enabled: %u\n", enabled);
 
 		/* Skip disabled plugins */
 		if(false == enabled) {
 			LOG_INFO("Plugin '%s' is disabled. Skipping.\n", name.c_str());
 			continue;
-		}
-
-		/* Build path to the plugin file */
-		if(library[0] != '/') {
-			library = plugin_path + library;
-		}
-
-		/* Build path to the (optional) plugin config file */
-		if(config_file != "" && config_file[0] != '/') {
-			config_file = plugin_config_path + config_file;
 		}
 
 		PluginCore* p = new PluginCore(context, name);

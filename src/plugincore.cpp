@@ -77,7 +77,7 @@ bool PluginCore::load(const string so_name, const string conf_name) {
 
 	/* Load the plugin configuration file. Plugin load fails if the
 	   configuration files could not be loaded. */
-	if(conf_name != "") {
+	if(!conf_name.empty()) {
 		LOG_DEBUG("Attempting to load plugin config file '%s'\n", conf_name.c_str());
 		try{
 			config = new Config();
@@ -356,6 +356,7 @@ void PluginCore::parse_outputs() {
 	try {
 		const Setting& root = config->getRoot();
 		const Setting& conf_plugins = root["outputs"];
+		string output_list_str;
 
 		LOG_INFO("There are %d outputs to check.\n", conf_plugins.getLength());
 
@@ -368,12 +369,14 @@ void PluginCore::parse_outputs() {
 				continue;
 			}
 	
-			LOG_INFO("Output: %s\n", name.c_str());
+			output_list_str += name + ',';
 			output_list.insert(name);
 			if(i == 0) {
 				default_output = name;
 			}
 		}
+		//output_list_str.erase(output_list_str.end());
+		LOG_INFO("  Outputs: %s\n", output_list_str.c_str());
 	} catch (SettingNotFoundException& ex) {
 		LOG_WARNING("Plugin '%s' does not have an 'outputs' section. I can not check outputs.\n",
 				filename.c_str());
