@@ -12,6 +12,13 @@ LT_INIT([dlopen shared disable-static])
 srcdir=`pwd`
 bindir="$srcdir/run"
 libdir="$srcdir/run/plugins"
+sysconfdir="$srcdir/run"
+
+CONFIGURATION_DIR="$srcdir/doc/configuration/examples"
+DEFAULT_CONFIGURATION="simple"
+
+AC_SUBST([CONFIGURATION_DIR])
+AC_SUBST([DEFAULT_CONFIGURATION])
 
 LIBS="-rdynamic -ldl -lpcap -lresolv -lrt $LIBS"
 

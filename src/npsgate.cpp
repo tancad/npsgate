@@ -54,7 +54,7 @@ string _plugin_name = "CORE";
 unsigned int NpsGateVar::alloc_count = 0;
 
 static NpsGateContext context;
-static const char* config_file = "nps_gate.config";
+static const char* config_file = "npsgate.config";
 static bool exit_flag = false;
 
 static void usage(const char* pgm_name) {
@@ -134,6 +134,16 @@ int main(int argc, char** argv) {
 	 will load the config file and redirect to a file if needed. */
 	Logger::init(stdout);
 
+
+	if(!boost::filesystem::exists(config_file)) {
+		if(!strcmp(config_file, "npsgate.config")) {
+			fprintf(stderr, "\nDefault configuration file './npsgate.config' not found.\n\n");
+			fprintf(stderr, "To load a specific configuration file, use the '-c <path to file>' command line option.\n\n\n");
+		} else {
+			fprintf(stderr, "\n\nConfiguration file specified by the '-c' option not found. Exiting.\n\n\n");
+		}
+		return -1;
+	}
 
 	/* Load the config file and store in the NpsGateContext */
 	try{
