@@ -28,10 +28,10 @@ libraries:
 Specific plugins may have additional requirements. Once the above library prerequisites
 have been met, NpsGate can be compiled as follows:
 
-$ ./autogen.sh
-$ ./configure
-$ make
-$ make install
+    $ ./autogen.sh
+    $ ./configure
+    $ make
+    $ make install
 
 By default NpsGate is installed in the 'run' directory. The installation directory can
 be changed using the 'configure' script.
@@ -39,14 +39,20 @@ be changed using the 'configure' script.
 
 Configuration
 -------------
-NpsGate requires a configuration file to run. See examples in the 'docs' directory.
+NpsGate requires a configuration file to run. A simple default configuration is installed
+in the 'run' directory. More examples can be found in the 'doc/configuration/examples' directory.
 
 
 Running
 -------
+NpsGate can be run using the default configuration using the following command from the
+run directory:
+
+    $ sudo ./npsgate
+
 NpsGate can be started with a specific configuration using the following command:
 
-$ sudo ./npsgate -c <path to configuration file>
+    $ sudo ./npsgate -c /path/to/main/configuration/file
 
 NpsGate typically must be run as root in order to intercept packets from the kernel.
 
