@@ -1,21 +1,29 @@
 /******************************************************************************
-**
-**  This file is part of NpsGate.
-**
-**  This software was developed at the Naval Postgraduate School by employees
-**  of the Federal Government in the course of their official duties. Pursuant
-**  to title 17 Section 105 of the United States Code this software is not
-**  subject to copyright protection and is in the public domain. NpsGate is an
-**  experimental system. The Naval Postgraduate School assumes no responsibility
-**  whatsoever for its use by other parties, and makes no guarantees, expressed
-**  or implied, about its quality, reliability, or any other characteristic. We
-**  would appreciate acknowledgment if the software is used.
-**
-**  @file npsgate.cpp
-**  @author Lance Alt (lancealt@gmail.com)
-**  @date 2014/09/01
-**
-*******************************************************************************/
+  **
+  **  NpsGate.
+  **  Copyright (c) 2014, Lance Alt
+  **
+  **  This file is part of NpsGate.
+  **
+  **  This program is free software: you can redistribute it and/or modify
+  **  it under the terms of the GNU General Public License as published
+  **  by the Free Software Foundation, either version 3 of the License, or
+  **  (at your option) any later version.
+  ** 
+  **  This program is distributed in the hope that it will be useful,
+  **  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  **  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  **  GNU General Public License for more details.
+  ** 
+  **  You should have received a copy of the GNU Lesser General Public License
+  **  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  ** 
+  **
+  **  @file npsgate.cpp
+  **  @author Lance Alt (lancealt@gmail.com)
+  **  @date 2014/09/23
+  **
+  *******************************************************************************/
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -118,6 +126,8 @@ int main(int argc, char** argv) {
 	term_action.sa_flags = 0;
 	sigaction(SIGPIPE,  &term_action, NULL);
 
+	/* Determine the directory where the npsgate executable resides */
+	context.npsgate_execute_path = boost::filesystem::path(argv[0]).parent_path();
 
 
 	/* Initialize the logger. By default send everything to stdout. Later we
@@ -129,7 +139,10 @@ int main(int argc, char** argv) {
 	try{
 		context.config = new Config();
 		context.config->readFile(config_file);
-		context.config_path = boost::filesystem::path(config_file).parent_path();
+		context.main_config_path = boost::filesystem::path(config_file).parent_path();
+
+		context.plugin_dir = (const string&) context.config->lookup("NpsGate.plugindir");
+		context.plugin_config_dir = (const string&) context.config->lookup("NpsGate.plugin_conf_dir");
 	} catch (const FileIOException& fioex) {
 		printf("Failed to load configuration file: %s\n", config_file);
 		termination_handler(SIGINT);
@@ -142,6 +155,12 @@ int main(int argc, char** argv) {
 	/* Initialize the logger with information from the config file. */
 	Logger::config(context.config, context);
 
+
+	LOG_DEBUG("Main config file loaded\n");
+	LOG_DEBUG("  npsgate execute path: %s\n", context.npsgate_execute_path.c_str());
+	LOG_DEBUG("  plugin dir: %s\n", context.plugin_dir.c_str());
+	LOG_DEBUG("  main config path: %s\n", context.main_config_path.c_str());
+	LOG_DEBUG("  plugin config dir: %s\n", context.plugin_config_dir.c_str());
 
 	/* Create instances of all our core modules and store in NpsGateContext */
 	context.plugin_manager = new PluginManager(context);

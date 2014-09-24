@@ -1,24 +1,32 @@
 /******************************************************************************
-**
-**  This file is part of NpsGate.
-**
-**  This software was developed at the Naval Postgraduate School by employees
-**  of the Federal Government in the course of their official duties. Pursuant
-**  to title 17 Section 105 of the United States Code this software is not
-**  subject to copyright protection and is in the public domain. NpsGate is an
-**  experimental system. The Naval Postgraduate School assumes no responsibility
-**  whatsoever for its use by other parties, and makes no guarantees, expressed
-**  or implied, about its quality, reliability, or any other characteristic. We
-**  would appreciate acknowledgment if the software is used.
-**
-**  @file pluginmanager.h
-**  @author Lance Alt (lancealt@gmail.com)
-**  @date 2014/09/01
-**
-*******************************************************************************/
+  **
+  **  NpsGate.
+  **  Copyright (c) 2014, Lance Alt
+  **
+  **  This file is part of NpsGate.
+  **
+  **  This program is free software: you can redistribute it and/or modify
+  **  it under the terms of the GNU General Public License as published
+  **  by the Free Software Foundation, either version 3 of the License, or
+  **  (at your option) any later version.
+  ** 
+  **  This program is distributed in the hope that it will be useful,
+  **  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  **  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  **  GNU General Public License for more details.
+  ** 
+  **  You should have received a copy of the GNU Lesser General Public License
+  **  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  ** 
+  **
+  **  @file pluginmanager.h
+  **  @author Lance Alt (lancealt@gmail.com)
+  **  @date 2014/09/23
+  **
+  *******************************************************************************/
 
-#ifndef PLUGINMAMAGER_HPP_INCLUDED
-#define PLUGINMAMAGER_HPP_INCLUDED
+#ifndef PLUGINMAMAGER_H_INCLUDED
+#define PLUGINMAMAGER_H_INCLUDED
 
 #include <stdio.h>
 #include <string.h>
@@ -49,11 +57,11 @@ class PluginManager {
 		PluginManager(const NpsGateContext&);
 		virtual ~PluginManager(); 
 
-		void load_plugins();
-		NpsGate::JobQueue* get_packet_queue(string name);
-
+		void load_plugin(const Setting& plugin_config);
 		void unload_plugin(PluginCore* p);
+		void load_plugins();
 
+		NpsGate::JobQueue* get_input_queue(const string& name);
 		string get_name_from_thread(pthread_t);
 
 		friend class Monitor;
