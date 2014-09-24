@@ -1,27 +1,33 @@
 /******************************************************************************
-**
-**  This file is part of NpsGate.
-**
-**  This software was developed at the Naval Postgraduate School by employees
-**  of the Federal Government in the course of their official duties. Pursuant
-**  to title 17 Section 105 of the United States Code this software is not
-**  subject to copyright protection and is in the public domain. NpsGate is an
-**  experimental system. The Naval Postgraduate School assumes no responsibility
-**  whatsoever for its use by other parties, and makes no guarantees, expressed
-**  or implied, about its quality, reliability, or any other characteristic. We
-**  would appreciate acknowledgment if the software is used.
-**
-**  @file ip_output.cpp
-**  @author Lance Alt (lancealt@gmail.com)
-**  @date 2014/09/01
-**
-*******************************************************************************/
+  **
+  **  NpsGate IPOutput plugin.
+  **  Copyright (c) 2014, Lance Alt
+  **
+  **  This file is part of NpsGate.
+  **
+  **  This program is free software: you can redistribute it and/or modify
+  **  it under the terms of the GNU General Public License as published
+  **  by the Free Software Foundation, either version 3 of the License, or
+  **  (at your option) any later version.
+  **  
+  **  This program is distributed in the hope that it will be useful,
+  **  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  **  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  **  GNU General Public License for more details.
+  ** 
+  **  You should have received a copy of the GNU Lesser General Public License
+  **  along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  ** 
+  **
+  **  @file ip_output.cpp
+  **  @author Lance Alt (lancealt@gmail.com)
+  **  @date 2014/09/23
+  **
+  *******************************************************************************/
 
 #include <pcap.h>
 #include <crafter.h>
 #include <unistd.h>
-#include <linux/netlink.h>
-#include <linux/rtnetlink.h>
 
 #include "../npsgate_plugin.hpp"
 #include "../logger.hpp"
@@ -36,66 +42,21 @@ public:
 	}
 
 	virtual bool init() {
-		config = get_config();
-		LOG_INFO("IPOutput plugin starting intialization.\n");
+		raw_socket = create_raw_socket();
 
-		if(!config) {
-			LOG_CRITICAL("Error accessing config file!\n");
-			return false;
-		}
-
-		if(!config->lookupValue("ipoutput.output_dev", output_dev)) {
-			LOG_CRITICAL("Output device not specified!\n");
-			return false;
-		}
-
-		config->lookupValue("ipoutput.src_mac", src_mac);
-		config->lookupValue("ipoutput.dest_mac", dest_mac);
-
-
-		LOG_INFO("IPOutput device is '%s'\n", output_dev.c_str());
-
-		raw_socket = create_raw_socket(output_dev);
-
-	//	NpsGateVar* link_up = new NpsGateVar();
-	//	link_up->set(true);
-	//	publish("IPInput.link_up", link_up);
-
-
-		return true;
+		return (raw_socket == -1 ? false : true);
 	}
 
 	virtual bool process_packet(Packet* p) {
-		bool rval = true;
-
-		Ethernet* eth = p->GetLayer<Ethernet>();
+		bool rval = false;
 		IP* ip = p->GetLayer<IP>();
-		TCP* tcp = p->GetLayer<TCP>();
-
-
-		if(eth) {
-			LOG_TRACE("Received Ethernet packet. Ethertype: 0x%x\n", eth->GetType()); 
-//			LOG_TRACE("Stripping Ethernet layer. Count: %d\n", p->GetLayerCount());
-//			Packet p2 = p->SubPacket(1, p->GetLayerCount());
-		}
 
 		if(!ip) {
 			LOG_WARNING("Received a non-IP packet. Dropping packet.\n");
-			drop_packet(p);
-			return true;
-		}
-
-		if(tcp) {
-			LOG_TRACE("Sending packet: %u bytes (%u payload)\n", p->GetSize(), tcp->GetPayloadSize());
-			LOG_INFO("%s:%u => %s:%u\n", ip->GetSourceIP().c_str(), tcp->GetSrcPort(),
-					ip->GetDestinationIP().c_str(), tcp->GetDstPort());
-		}
-
-		if(!p->SocketSend(raw_socket)) {
-		//if(!p->Send(output_dev)) {
-			LOG_WARNING("Failed to send packet on interface: %s. Packet will be dropped!\n",
-					output_dev.c_str());
-			rval = false;
+		} else if(!p->SocketSend(raw_socket)) {
+			LOG_WARNING("Failed to send packet. Packet will be dropped!\n");
+		} else {
+			rval = true;
 		}
 
 		drop_packet(p);
@@ -113,20 +74,14 @@ public:
 	}
 
 private:
-	const Config* config;
-	string	output_dev;
-	string src_mac;
-	string dest_mac;
 	int raw_socket;
 
-	int create_raw_socket(string device) {
+	int create_raw_socket() {
 		int s;
 		int val = 1;
 
 		s = socket(AF_INET, SOCK_RAW, 4);
-//		setsockopt(s, SOL_SOCKET, SO_DONTROUTE, &val, sizeof(val));
 		setsockopt(s, IPPROTO_IP, IP_HDRINCL, &val, sizeof(val));
-//		setsockopt(s, SOL_SOCKET, SO_BINDTODEVICE, device.c_str(), device.length());
 		if(s == -1) {
 			LOG_CRITICAL("Failed to create raw socket. Reason: %s\n", strerror(errno));
 		}
